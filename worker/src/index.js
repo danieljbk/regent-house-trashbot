@@ -303,6 +303,31 @@ export default {
     }
 
     if (url.pathname === '/report' && request.method === 'POST') {
+      // --- PIN VALIDATION ---
+      let body = {}
+      try {
+        body = await request.json()
+      } catch (e) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid request body.' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        )
+      }
+
+      const pin = typeof body.pin === 'string' ? body.pin.trim() : ''
+      if (!env.REPORT_PIN || pin !== env.REPORT_PIN) {
+        return new Response(
+          JSON.stringify({ error: 'Incorrect PIN.' }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        )
+      }
+
       let rotationDb
       try {
         rotationDb = getRotationDb(env)

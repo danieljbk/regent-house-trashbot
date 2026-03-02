@@ -1,32 +1,52 @@
 const WORKER_URL = 'https://trashbotapi.kwon.ai'
 
-// Get references to all the HTML elements
 const onDutyEl = document.getElementById('on-duty')
-const onDutyDatesEl = document.getElementById('on-duty-dates')
+const trashDayDateEl = document.getElementById('trash-day-date')
 const upcomingListEl = document.getElementById('upcoming-list')
 const penaltyStatusEl = document.getElementById('penalty-status')
 const lastWeekReportEl = document.getElementById('last-week-report')
 const reportButton = document.getElementById('report-button')
 const reportResponseEl = document.getElementById('report-response')
 const lastWeekEl = document.getElementById('last-week')
+const dateBadgeEl = document.getElementById('date-badge')
+const rotationListEl = document.getElementById('rotation-list')
+const reportToggle = document.getElementById('report-toggle')
+const reportBody = document.getElementById('report-body')
+const reportChevron = document.getElementById('report-chevron')
+const reportPinInput = document.getElementById('report-pin')
 
-const MAX_UPCOMING_ROWS = 3
+const MAX_UPCOMING_ROWS = 4
 
-// --- NEW, STABLE DATE HELPER FUNCTIONS ---
+// --- DATE HELPERS ---
 
 /**
- * Calculates the date of the Monday for the week of the given date.
- * @param {Date} d - The reference date.
- * @returns {Date} - The date of the Monday of that week.
+ * Returns the Tuesday of the current duty week.
+ * Duty week runs Tue–Mon. Sun/Mon belong to the previous Tuesday's cycle.
  */
-const getStartOfWeek = (d) => {
-  const date = new Date(d)
-  const day = date.getDay() // Sunday = 0, Monday = 1, etc.
-  const diff = date.getDate() - day + (day === 0 ? -6 : 1) // Adjust for Sunday
-  return new Date(date.setDate(diff))
+const getThisWeekTuesday = (from) => {
+  const d = new Date(from)
+  const day = d.getDay() // 0=Sun … 6=Sat
+  let diff
+  if (day < 2) {
+    // Sunday (0) or Monday (1): go back to previous Tuesday
+    diff = -(day + 5)
+  } else {
+    // Tuesday (2) through Saturday (6): go back to this week's Tuesday
+    diff = -(day - 2)
+  }
+  d.setDate(d.getDate() + diff)
+  return d
 }
 
-const formatDate = (date) => {
+const formatDateFull = (date) => {
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
+const formatDateShort = (date) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
@@ -69,32 +89,44 @@ const deriveUpcoming = (data) => {
   return names
 }
 
-/**
- * Fetches the schedule and updates the entire webpage.
- */
+// --- REPORT TOGGLE ---
+
+reportToggle.addEventListener('click', () => {
+  const isHidden = reportBody.style.display === 'none'
+  reportBody.style.display = isHidden ? 'block' : 'none'
+  reportChevron.classList.toggle('open', isHidden)
+})
+
+// --- FETCH SCHEDULE ---
+
 async function fetchSchedule() {
+  // Populate date badge immediately (no API needed)
+  const today = new Date()
+  dateBadgeEl.textContent =
+    'Today is ' +
+    today.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+    })
+
   try {
     const response = await fetch(`${WORKER_URL}/schedule`)
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
     const data = await response.json()
 
-    // --- 1. ESTABLISH STABLE DATE ANCHORS ---
-    const today = new Date()
-    const startOfWeek = getStartOfWeek(today) // The Monday of this week
-    const endOfWeek = new Date(startOfWeek)
-    endOfWeek.setDate(startOfWeek.getDate() + 6) // The Sunday of this week
-
-    // --- 2. Populate Hero Card with Correct Dates ---
+    // Hero card
     onDutyEl.textContent = data.onDuty
-    onDutyDatesEl.textContent = `${formatDate(startOfWeek)} – ${formatDate(
-      endOfWeek
-    )}`
 
-    // --- 3. Populate Secondary Info ---
+    // Trash day date (Tuesday of this duty week)
+    const thisTrashDay = getThisWeekTuesday(today)
+    trashDayDateEl.textContent = 'Trash day: ' + formatDateFull(thisTrashDay)
+
+    // Last week
     lastWeekEl.textContent = data.lastWeek
     lastWeekReportEl.textContent = data.lastWeek
 
-    // --- 4. Populate Upcoming Schedule Table with Correct Dates ---
+    // Upcoming schedule with Tuesday dates
     const upcomingNames = deriveUpcoming(data)
     upcomingListEl.innerHTML = ''
 
@@ -108,23 +140,44 @@ async function fetchSchedule() {
     }
 
     upcomingNames.forEach((name, index) => {
-      // Calculate each upcoming week's Monday based on the stable anchor
-      const upcomingWeekStart = new Date(startOfWeek)
-      upcomingWeekStart.setDate(startOfWeek.getDate() + (index + 1) * 7)
+      const upcomingTuesday = new Date(thisTrashDay)
+      upcomingTuesday.setDate(thisTrashDay.getDate() + (index + 1) * 7)
 
       const row = document.createElement('tr')
       const nameCell = document.createElement('td')
       const dateCell = document.createElement('td')
 
       nameCell.textContent = name
-      dateCell.textContent = formatDate(upcomingWeekStart)
+      dateCell.textContent = formatDateFull(upcomingTuesday)
 
       row.appendChild(nameCell)
       row.appendChild(dateCell)
       upcomingListEl.appendChild(row)
     })
 
-    // --- 5. Handle Penalty Banner ---
+    // Rotation order
+    rotationListEl.innerHTML = ''
+    const team = data.team || []
+    const currentIndex = Number.parseInt(data.currentIndex, 10)
+
+    team.forEach((member, index) => {
+      const li = document.createElement('li')
+      if (index === currentIndex) {
+        li.classList.add('is-current')
+      }
+
+      const dot = document.createElement('span')
+      dot.className = 'dot'
+
+      const nameSpan = document.createElement('span')
+      nameSpan.textContent = member.name
+
+      li.appendChild(dot)
+      li.appendChild(nameSpan)
+      rotationListEl.appendChild(li)
+    })
+
+    // Penalty banner
     const penaltyInfo = data.penaltyInfo
     if (penaltyInfo && penaltyInfo.bannerText) {
       penaltyStatusEl.textContent = penaltyInfo.bannerText
@@ -134,14 +187,14 @@ async function fetchSchedule() {
       const afterWeekCount = penaltyInfo.weeksRemainingAfterCurrent ?? 0
       const afterWeekWord = afterWeekCount === 1 ? 'week' : 'weeks'
       const message = penaltyInfo.isFinalWeek
-        ? `PENALTY ACTIVE: ${offenderName} is serving the final penalty week. The normal rotation resumes next week.`
-        : `PENALTY ACTIVE: ${offenderName} is on week ${penaltyInfo.currentWeek} of ${penaltyInfo.totalWeeks}. ${afterWeekCount} ${afterWeekWord} remain afterward.`
+        ? `Penalty active: ${offenderName} is serving the final penalty week. Normal rotation resumes next week.`
+        : `Penalty active: ${offenderName} is on week ${penaltyInfo.currentWeek} of ${penaltyInfo.totalWeeks}. ${afterWeekCount} ${afterWeekWord} remain.`
       penaltyStatusEl.textContent = message
       penaltyStatusEl.style.display = 'block'
     } else if (penaltyInfo && penaltyInfo.startsNextRotation) {
       const offenderName = penaltyInfo.offenderName || data.lastWeek
       const weekWord = penaltyInfo.weekString || 'weeks'
-      penaltyStatusEl.textContent = `Penalty recorded: ${offenderName} owes ${penaltyInfo.weeksRemaining} ${weekWord}. The rotation will pause when their turn arrives.`
+      penaltyStatusEl.textContent = `Penalty recorded: ${offenderName} owes ${penaltyInfo.weeksRemaining} ${weekWord}. Rotation pauses when their turn arrives.`
       penaltyStatusEl.style.display = 'block'
     } else {
       penaltyStatusEl.textContent = ''
@@ -153,26 +206,48 @@ async function fetchSchedule() {
   }
 }
 
-/**
- * Event listener for the "Report Missed Duty" button.
- */
+// --- REPORT BUTTON ---
+
 reportButton.addEventListener('click', async () => {
+  const pin = reportPinInput.value.trim()
+  if (!pin) {
+    reportResponseEl.textContent = 'Please enter the PIN.'
+    reportResponseEl.className = 'report-response error'
+    return
+  }
+
   if (
     !confirm(
-      `Are you sure you want to report ${lastWeekReportEl.textContent} for missing their duty?`
+      `Report ${lastWeekReportEl.textContent} for missing their duty?`
     )
   )
     return
 
   try {
     reportButton.disabled = true
-    reportResponseEl.textContent = 'Submitting report...'
-    const response = await fetch(`${WORKER_URL}/report`, { method: 'POST' })
+    reportResponseEl.textContent = 'Submitting...'
+    reportResponseEl.className = 'report-response'
+
+    const response = await fetch(`${WORKER_URL}/report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin }),
+    })
+
     const result = await response.json()
-    reportResponseEl.textContent = result.message
-    fetchSchedule()
+
+    if (!response.ok) {
+      reportResponseEl.textContent = result.error || 'Report failed.'
+      reportResponseEl.className = 'report-response error'
+    } else {
+      reportResponseEl.textContent = result.message
+      reportResponseEl.className = 'report-response success'
+      reportPinInput.value = ''
+      fetchSchedule()
+    }
   } catch (error) {
-    reportResponseEl.textContent = 'An error occurred.'
+    reportResponseEl.textContent = 'Network error. Try again.'
+    reportResponseEl.className = 'report-response error'
   } finally {
     reportButton.disabled = false
   }

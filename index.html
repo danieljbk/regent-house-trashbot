@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Regent House Trash Duty</title>
+    <title>Trash Duty</title>
     <link
       rel="icon"
       href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🗑️</text></svg>"
@@ -11,58 +11,74 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <header>
-      <h1>Regent House Trash Duty</h1>
-    </header>
+    <div class="container">
+      <header>
+        <h1>Trash Duty</h1>
+      </header>
 
-    <main>
+      <div class="date-badge" id="date-badge"></div>
+
       <div
         id="penalty-status"
         class="penalty-banner"
         style="display: none"
       ></div>
 
-      <!-- Hero Card for This Week -->
-      <div class="card hero-card">
-        <p class="label">🎯 On Duty This Week</p>
-        <h2 class="person-name" id="on-duty">Loading...</h2>
-        <p class="date-range" id="on-duty-dates">Loading...</p>
-      </div>
+      <section class="card">
+        <span class="label">Current duty</span>
+        <h2 class="hero-name" id="on-duty">Loading...</h2>
+        <p class="hero-date" id="trash-day-date"></p>
+      </section>
 
-      <!-- Upcoming Schedule Card -->
-      <div class="card">
-        <p class="label">🗓️ Upcoming Schedule</p>
+      <section class="card last-week-card">
+        <span class="label">Last week</span>
+        <span class="last-week-name" id="last-week">...</span>
+      </section>
+
+      <section class="card">
+        <span class="label">Upcoming</span>
         <table class="schedule-table">
           <thead>
             <tr>
               <th>Person</th>
-              <th>Week of</th>
+              <th>Trash day</th>
             </tr>
           </thead>
-          <tbody id="upcoming-list">
-            <!-- JS will populate this -->
-          </tbody>
+          <tbody id="upcoming-list"></tbody>
         </table>
-      </div>
+      </section>
 
-      <!-- Danger Zone Card -->
-      <div class="card danger-zone">
-        <h3>⚠️ Missed Duty?</h3>
-        <p>
-          If the person on duty last week (<strong id="last-week-report"
-            >...</strong
-          >) did not complete the task, press this button to assign a penalty.
-        </p>
-        <button id="report-button">Report Missed Duty</button>
-        <p id="report-response"></p>
-      </div>
+      <section class="card">
+        <span class="label">Rotation order</span>
+        <ul class="rotation-list" id="rotation-list"></ul>
+      </section>
 
-      <!-- Secondary Info -->
-      <div class="secondary-info">
-        <p>Last Week: <strong id="last-week">...</strong></p>
-      </div>
-    </main>
+      <section class="card">
+        <div class="report-header" id="report-toggle">
+          <span class="label">Report missed duty</span>
+          <span class="chevron" id="report-chevron">&#9662;</span>
+        </div>
+        <div class="report-body" id="report-body" style="display: none">
+          <p class="report-description">
+            If <strong id="last-week-report">...</strong> did not take out the
+            trash, file a penalty. This assigns them 3 consecutive weeks.
+          </p>
+          <div class="pin-row">
+            <input
+              type="password"
+              id="report-pin"
+              class="pin-input"
+              placeholder="Enter PIN"
+              maxlength="10"
+              autocomplete="off"
+            />
+            <button id="report-button" class="btn-destructive">Report</button>
+          </div>
+          <p class="report-response" id="report-response"></p>
+        </div>
+      </section>
+    </div>
 
-    <script src="script.js?v=20250926"></script>
+    <script src="script.js?v=20260301"></script>
   </body>
 </html>

@@ -104,7 +104,7 @@ export default {
         if (personIndex === activePenalty.offenderIndex) {
           personalStatus = `⚠️ ${
             person.name
-          }, you are on Trash Duty.\nThis is week ${
+          }, you are on Trash Duty.\nThis is duty ${
             activePenalty.weeksServed + 1
           } of ${PENALTY_LENGTH} for your penalty.`
         } else {
@@ -115,10 +115,10 @@ export default {
             Math.max(0, activePenalty.remainingAfterThisWeek)
           const theirTurnDate = new Date()
           theirTurnDate.setDate(thisWeekDate.getDate() + weeksUntilTurn * 7)
-          const weekString = weeksUntilTurn === 1 ? 'week' : 'weeks'
+          const turnWord = weeksUntilTurn === 1 ? 'Tuesday' : 'Tuesdays'
           personalStatus = `${
             person.name
-          }, your next Trash Duty is in ${weeksUntilTurn} ${weekString} (week of ${formatDate(
+          }, your next Trash Duty is in ${weeksUntilTurn} ${turnWord} (${formatDate(
             theirTurnDate
           )}).`
         }
@@ -130,14 +130,14 @@ export default {
         if (weeksUntilTurn === 0) {
           personalStatus = `${
             person.name
-          }, you are on Trash Duty this week (week of ${formatDate(
+          }, you are on Trash Duty this Tuesday (${formatDate(
             theirTurnDate
           )}).`
         } else {
-          const weekString = weeksUntilTurn === 1 ? 'week' : 'weeks'
+          const turnWord = weeksUntilTurn === 1 ? 'Tuesday' : 'Tuesdays'
           personalStatus = `${
             person.name
-          }, your next Trash Duty is in ${weeksUntilTurn} ${weekString} (week of ${formatDate(
+          }, your next Trash Duty is in ${weeksUntilTurn} ${turnWord} (${formatDate(
             theirTurnDate
           )}).`
         }
@@ -145,8 +145,8 @@ export default {
 
       const messageBody =
         `${personalStatus}\n\n` +
-        `🎯 This Week: ${personOnDuty.name}\n` +
-        `➡️ Next Week: ${nextPersonUp.name}\n\n` +
+        `🎯 This Tuesday: ${personOnDuty.name}\n` +
+        `➡️ Next Tuesday: ${nextPersonUp.name}\n\n` +
         `🗓️ Full Schedule:\n` +
         `https://trashbot.kwon.ai\n\n` +
         `❕ Missed a duty? Report it on the site.`
@@ -231,12 +231,12 @@ export default {
             )
             const activeWeekNumber = weeksServed + 1
             const weeksAfterThisWeek = Math.max(0, futureWeeks)
-            const remainingWeekWord =
-              weeksAfterThisWeek === 1 ? 'week' : 'weeks'
+            const remainingWord =
+              weeksAfterThisWeek === 1 ? 'Tuesday' : 'Tuesdays'
             const isFinalWeek = weeksAfterThisWeek === 0
             const activeBanner = isFinalWeek
-              ? `PENALTY ACTIVE: ${offender.name} is serving the final penalty week (${totalPenaltyWeeks}/${totalPenaltyWeeks}). The normal rotation resumes next week.`
-              : `PENALTY ACTIVE: ${offender.name} is on week ${activeWeekNumber} of ${totalPenaltyWeeks}. ${weeksAfterThisWeek} ${remainingWeekWord} will remain afterward.`
+              ? `PENALTY ACTIVE: ${offender.name} is serving the final penalty duty (${totalPenaltyWeeks}/${totalPenaltyWeeks}). Normal rotation resumes next Tuesday.`
+              : `PENALTY ACTIVE: ${offender.name} is on duty ${activeWeekNumber} of ${totalPenaltyWeeks}. ${weeksAfterThisWeek} ${remainingWord} remain.`
 
             penaltyInfo = {
               offenderName: offender.name,
@@ -244,7 +244,7 @@ export default {
               rawWeeksRemaining: futureWeeks,
               weeksServed,
               currentWeek: activeWeekNumber,
-              weekString: weeksIncludingCurrent === 1 ? 'week' : 'weeks',
+              weekString: weeksIncludingCurrent === 1 ? 'Tuesday' : 'Tuesdays',
               weeksRemainingAfterCurrent: weeksAfterThisWeek,
               totalWeeks: totalPenaltyWeeks,
               isActive: true,
@@ -256,20 +256,20 @@ export default {
             onDutyName = offender.name
             lastWeekName = offender.name
           } else if (offender && futureWeeks > 0) {
-            const weekString = futureWeeks === 1 ? 'week' : 'weeks'
+            const dutyString = futureWeeks === 1 ? 'Tuesday' : 'Tuesdays'
             penaltyInfo = {
               offenderName: offender.name,
               weeksRemaining: futureWeeks,
               rawWeeksRemaining: futureWeeks,
               weeksServed: 0,
               currentWeek: 0,
-              weekString,
+              weekString: dutyString,
               weeksRemainingAfterCurrent: futureWeeks,
               totalWeeks: totalPenaltyWeeks,
               isActive: false,
               startsNextRotation: true,
               isFinalWeek: false,
-              bannerText: `Penalty recorded: ${offender.name} owes ${futureWeeks} ${weekString}. The rotation will pause when their turn arrives.`,
+              bannerText: `Penalty recorded: ${offender.name} owes ${futureWeeks} ${dutyString}. The rotation will pause when their turn arrives.`,
             }
 
             lastWeekName = offender.name
@@ -407,7 +407,7 @@ export default {
         )
           const penaltyMessage =
           `⚠️ Penalty filed: ${offender.name} missed trash duty.` +
-          `\n${offender.name} will serve a ${PENALTY_LENGTH}-week penalty starting now.` +
+          `\n${offender.name} will serve a ${PENALTY_LENGTH}-Tuesday penalty starting now.` +
           `\n\nCheck the schedule: https://trashbot.kwon.ai`
 
         const recipients = teamData.filter(
@@ -430,7 +430,7 @@ export default {
 
       const responseData = {
         message:
-          'Penalty has been recorded. The offender is now on duty for the next three weeks.',
+          'Penalty has been recorded. The offender is now on duty for the next 3 Tuesdays.',
       }
 
       return new Response(JSON.stringify(responseData), {

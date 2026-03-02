@@ -4,10 +4,11 @@ const onDutyEl = document.getElementById('on-duty')
 const trashDayDateEl = document.getElementById('trash-day-date')
 const upcomingListEl = document.getElementById('upcoming-list')
 const penaltyStatusEl = document.getElementById('penalty-status')
-const lastWeekReportEl = document.getElementById('last-week-report')
+const prevDutyReportEl = document.getElementById('prev-duty-report')
 const reportButton = document.getElementById('report-button')
 const reportResponseEl = document.getElementById('report-response')
-const lastWeekEl = document.getElementById('last-week')
+const prevDutyEl = document.getElementById('prev-duty')
+const heroLabelEl = document.getElementById('hero-label')
 const dateBadgeEl = document.getElementById('date-badge')
 const rotationListEl = document.getElementById('rotation-list')
 const reportToggle = document.getElementById('report-toggle')
@@ -20,20 +21,13 @@ const MAX_UPCOMING_ROWS = 4
 // --- DATE HELPERS ---
 
 /**
- * Returns the Tuesday of the current duty week.
- * Duty week runs Tue–Mon. Sun/Mon belong to the previous Tuesday's cycle.
+ * Returns the Tuesday of the current duty week (Mon–Sun).
+ * Mon: forward 1 day to Tuesday. Tue–Sat: back to this Tuesday. Sun: back 5 days.
  */
 const getThisWeekTuesday = (from) => {
   const d = new Date(from)
-  const day = d.getDay() // 0=Sun … 6=Sat
-  let diff
-  if (day < 2) {
-    // Sunday (0) or Monday (1): go back to previous Tuesday
-    diff = -(day + 5)
-  } else {
-    // Tuesday (2) through Saturday (6): go back to this week's Tuesday
-    diff = -(day - 2)
-  }
+  const day = d.getDay()
+  const diff = day === 0 ? -5 : 2 - day
   d.setDate(d.getDate() + diff)
   return d
 }
@@ -115,19 +109,36 @@ async function fetchSchedule() {
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
     const data = await response.json()
 
-    // Hero card
-    onDutyEl.textContent = data.onDuty
+    // After Tuesday (Wed–Sun), shift forward: show next week's person as hero
+    const dayOfWeek = today.getDay()
+    const pastTuesday = dayOfWeek >= 3 || dayOfWeek === 0
 
-    // Trash day date (Tuesday of this duty week)
-    const thisTrashDay = getThisWeekTuesday(today)
-    trashDayDateEl.textContent = 'Trash day: ' + formatDateFull(thisTrashDay)
+    const allUpcoming = deriveUpcoming(data)
+    const thisWeekTue = getThisWeekTuesday(today)
 
-    // Last week
-    lastWeekEl.textContent = data.lastWeek
-    lastWeekReportEl.textContent = data.lastWeek
+    // Hero label: "Today's duty" on Tuesday, "Next duty" otherwise
+    const isTuesday = dayOfWeek === 2
+    heroLabelEl.textContent = isTuesday ? "Today's duty" : 'Next duty'
 
-    // Upcoming schedule with Tuesday dates
-    const upcomingNames = deriveUpcoming(data)
+    if (pastTuesday && allUpcoming.length > 0) {
+      // Trash day passed — show next person as hero
+      onDutyEl.textContent = allUpcoming[0]
+      const nextTuesday = new Date(thisWeekTue)
+      nextTuesday.setDate(thisWeekTue.getDate() + 7)
+      trashDayDateEl.textContent = formatDateFull(nextTuesday)
+      prevDutyEl.textContent = data.onDuty
+      prevDutyReportEl.textContent = data.onDuty
+    } else {
+      // Mon/Tue — show current person
+      onDutyEl.textContent = data.onDuty
+      trashDayDateEl.textContent = formatDateFull(thisWeekTue)
+      prevDutyEl.textContent = data.lastWeek
+      prevDutyReportEl.textContent = data.lastWeek
+    }
+
+    // Upcoming schedule — skip first entry if it's now the hero
+    const upcomingStart = pastTuesday ? 1 : 0
+    const upcomingNames = allUpcoming.slice(upcomingStart)
     upcomingListEl.innerHTML = ''
 
     if (upcomingNames.length === 0) {
@@ -139,9 +150,14 @@ async function fetchSchedule() {
       upcomingListEl.appendChild(row)
     }
 
+    // Base Tuesday for upcoming dates: offset by 1 week if past Tuesday
+    const upcomingBaseTue = pastTuesday
+      ? new Date(thisWeekTue.getTime() + 7 * 86400000)
+      : thisWeekTue
+
     upcomingNames.forEach((name, index) => {
-      const upcomingTuesday = new Date(thisTrashDay)
-      upcomingTuesday.setDate(thisTrashDay.getDate() + (index + 1) * 7)
+      const upcomingTuesday = new Date(upcomingBaseTue)
+      upcomingTuesday.setDate(upcomingBaseTue.getDate() + (index + 1) * 7)
 
       const row = document.createElement('tr')
       const nameCell = document.createElement('td')
@@ -184,17 +200,18 @@ async function fetchSchedule() {
       penaltyStatusEl.style.display = 'block'
     } else if (penaltyInfo && penaltyInfo.isActive) {
       const offenderName = penaltyInfo.offenderName || data.lastWeek
-      const afterWeekCount = penaltyInfo.weeksRemainingAfterCurrent ?? 0
-      const afterWeekWord = afterWeekCount === 1 ? 'week' : 'weeks'
+      const remaining = penaltyInfo.weeksRemainingAfterCurrent ?? 0
+      const remainWord = remaining === 1 ? 'Tuesday' : 'Tuesdays'
       const message = penaltyInfo.isFinalWeek
-        ? `Penalty active: ${offenderName} is serving the final penalty week. Normal rotation resumes next week.`
-        : `Penalty active: ${offenderName} is on week ${penaltyInfo.currentWeek} of ${penaltyInfo.totalWeeks}. ${afterWeekCount} ${afterWeekWord} remain.`
+        ? `Penalty active: ${offenderName} is serving the final penalty duty. Normal rotation resumes next Tuesday.`
+        : `Penalty active: ${offenderName} is on duty ${penaltyInfo.currentWeek} of ${penaltyInfo.totalWeeks}. ${remaining} ${remainWord} remain.`
       penaltyStatusEl.textContent = message
       penaltyStatusEl.style.display = 'block'
     } else if (penaltyInfo && penaltyInfo.startsNextRotation) {
       const offenderName = penaltyInfo.offenderName || data.lastWeek
-      const weekWord = penaltyInfo.weekString || 'weeks'
-      penaltyStatusEl.textContent = `Penalty recorded: ${offenderName} owes ${penaltyInfo.weeksRemaining} ${weekWord}. Rotation pauses when their turn arrives.`
+      const count = penaltyInfo.weeksRemaining
+      const word = count === 1 ? 'Tuesday' : 'Tuesdays'
+      penaltyStatusEl.textContent = `Penalty recorded: ${offenderName} owes ${count} ${word}. Rotation pauses when their turn arrives.`
       penaltyStatusEl.style.display = 'block'
     } else {
       penaltyStatusEl.textContent = ''
@@ -218,7 +235,7 @@ reportButton.addEventListener('click', async () => {
 
   if (
     !confirm(
-      `Report ${lastWeekReportEl.textContent} for missing their duty?`
+      `Report ${prevDutyReportEl.textContent} for missing their duty?`
     )
   )
     return

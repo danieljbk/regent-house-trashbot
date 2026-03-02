@@ -94,19 +94,19 @@ header h1 {
   margin-top: 0.25rem;
 }
 
-/* Last week card */
-.last-week-card {
+/* Previous duty card */
+.prev-duty-card {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 1rem 1.25rem;
 }
 
-.last-week-card .label {
+.prev-duty-card .label {
   margin-bottom: 0;
 }
 
-.last-week-name {
+.prev-duty-name {
   font-size: 0.9375rem;
   font-weight: 500;
 }

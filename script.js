@@ -109,7 +109,7 @@ async function fetchSchedule() {
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
     const data = await response.json()
 
-    // After Tuesday (Wed–Sun), shift forward: show next week's person as hero
+    // After Tuesday (Wed–Sun), shift forward: show next duty's person as hero
     const dayOfWeek = today.getDay()
     const pastTuesday = dayOfWeek >= 3 || dayOfWeek === 0
 
@@ -150,7 +150,7 @@ async function fetchSchedule() {
       upcomingListEl.appendChild(row)
     }
 
-    // Base Tuesday for upcoming dates: offset by 1 week if past Tuesday
+    // Base Tuesday for upcoming dates: offset by 1 cycle if past Tuesday
     const upcomingBaseTue = pastTuesday
       ? new Date(thisWeekTue.getTime() + 7 * 86400000)
       : thisWeekTue

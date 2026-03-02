@@ -51,7 +51,7 @@ export default {
       }
     }
 
-    // 3. IMPORTANT: Update the state for the NEW week *first*
+    // 3. Update state for the new rotation cycle *first*
     let activePenalty = null
     if (penaltyBox && penaltyWeeks > 0) {
       const remainingAfterThisWeek = Math.max(0, penaltyWeeks - 1)
@@ -77,7 +77,7 @@ export default {
       await rotationDb.put('CURRENT_INDEX', currentIndex.toString())
     }
 
-    // 3. Determine who is on duty for THIS week and NEXT week based on the new state
+    // 4. Determine who is on duty this cycle and next based on the new state
     let personOnDuty
     let nextPersonUp
 
@@ -93,7 +93,7 @@ export default {
       nextPersonUp = team[(currentIndex + 1) % teamSize]
     }
 
-    // 4. Loop through and send personalized, grammar-aware SMS messages
+    // 5. Loop through and send personalized SMS messages
     const sendQueue = []
 
     for (const [personIndex, person] of team.entries()) {
@@ -371,7 +371,7 @@ export default {
         Number.isInteger(existingPenalty.offenderIndex) &&
         existingFutureWeeks > 0
       // If a penalty is active we penalize the same offender again; otherwise fall back to
-      // “last week’s” person based on rotation order.
+      // the previous duty’s person based on rotation order.
       const offenderIndex = hasActivePenalty
         ? existingPenalty.offenderIndex
         : (currentIndex - 1 + teamSize) % teamSize

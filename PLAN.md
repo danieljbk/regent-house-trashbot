@@ -4,7 +4,7 @@
 - `index.html`: Static markup defining the dashboard layout, penalty banner container, hero card, upcoming table, and report controls.
 - `style.css`: Dark-themed styling for the dashboard cards, penalty banner, and button states.
 - `script.js`: Browser logic that fetches schedule data, derives upcoming assignments, renders the penalty banner, and posts penalty reports.
-- `worker/src/index.js`: Cloudflare Worker serving schedule/penalty APIs, running the rotation cron, sending Twilio SMS, and persisting state in KV.
+- `worker/src/index.js`: Cloudflare Worker serving schedule/penalty APIs, running the rotation cron, and persisting state in KV.
 - `worker/src/wrangler.toml`: Worker deployment configuration and KV binding.
 
 ## Key Data Flow Learnings

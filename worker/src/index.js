@@ -3,7 +3,7 @@ const PENALTY_LENGTH = 3
 export default {
   /**
    * SCHEDULED HANDLER
-   * Runs on a cron schedule to send notifications.
+   * Runs on a cron schedule to advance the rotation.
    */
   async scheduled(event, env, ctx) {
     let rotationDb
@@ -77,95 +77,6 @@ export default {
       await rotationDb.put('CURRENT_INDEX', currentIndex.toString())
     }
 
-    // 4. Determine who is on duty this cycle and next based on the new state
-    let personOnDuty
-    let nextPersonUp
-
-    if (activePenalty && activePenalty.offender) {
-      personOnDuty = activePenalty.offender
-      if (activePenalty.remainingAfterThisWeek >= 1) {
-        nextPersonUp = personOnDuty
-      } else {
-        nextPersonUp = team[(currentIndex + 1) % teamSize]
-      }
-    } else {
-      personOnDuty = team[currentIndex]
-      nextPersonUp = team[(currentIndex + 1) % teamSize]
-    }
-
-    // 5. Loop through and send personalized SMS messages
-    const sendQueue = []
-
-    for (const [personIndex, person] of team.entries()) {
-      let personalStatus = ''
-      const thisWeekDate = new Date()
-
-      if (activePenalty && activePenalty.offender) {
-        if (personIndex === activePenalty.offenderIndex) {
-          personalStatus = `⚠️ ${
-            person.name
-          }, you are on Trash Duty.\nThis is duty ${
-            activePenalty.weeksServed + 1
-          } of ${PENALTY_LENGTH} for your penalty.`
-        } else {
-          const normalWeeksUntilTurn =
-            (personIndex - currentIndex + teamSize) % teamSize
-          const weeksUntilTurn =
-            normalWeeksUntilTurn +
-            Math.max(0, activePenalty.remainingAfterThisWeek)
-          const theirTurnDate = new Date()
-          theirTurnDate.setDate(thisWeekDate.getDate() + weeksUntilTurn * 7)
-          const turnWord = weeksUntilTurn === 1 ? 'Tuesday' : 'Tuesdays'
-          personalStatus = `${
-            person.name
-          }, your next Trash Duty is in ${weeksUntilTurn} ${turnWord} (${formatDate(
-            theirTurnDate
-          )}).`
-        }
-      } else {
-        const weeksUntilTurn =
-          (personIndex - currentIndex + teamSize) % teamSize
-        const theirTurnDate = new Date()
-        theirTurnDate.setDate(thisWeekDate.getDate() + weeksUntilTurn * 7)
-        if (weeksUntilTurn === 0) {
-          personalStatus = `${
-            person.name
-          }, you are on Trash Duty this Tuesday (${formatDate(
-            theirTurnDate
-          )}).`
-        } else {
-          const turnWord = weeksUntilTurn === 1 ? 'Tuesday' : 'Tuesdays'
-          personalStatus = `${
-            person.name
-          }, your next Trash Duty is in ${weeksUntilTurn} ${turnWord} (${formatDate(
-            theirTurnDate
-          )}).`
-        }
-      }
-
-      const messageBody =
-        `${personalStatus}\n\n` +
-        `🎯 This Tuesday: ${personOnDuty.name}\n` +
-        `➡️ Next Tuesday: ${nextPersonUp.name}\n\n` +
-        `🗓️ Full Schedule:\n` +
-        `https://trashbot.kwon.ai\n\n` +
-        `❕ Missed a duty? Report it on the site.`
-
-      sendQueue.push(sendSms(env, person.phone, messageBody))
-    }
-
-    if (sendQueue.length > 0) {
-      const results = await Promise.allSettled(sendQueue)
-      const failures = results.filter((result) => {
-        if (result.status === 'rejected') return true
-        return result.value && result.value.ok === false
-      })
-      if (failures.length > 0) {
-        console.error(
-          `Scheduled run completed with ${failures.length} Twilio delivery issue(s).`
-        )
-      }
-    }
   },
 
   /**
@@ -405,27 +316,6 @@ export default {
         console.info(
           `Penalty activated for ${offender.name}. Future penalty weeks queued: ${penalty.weeksRemaining}`
         )
-          const penaltyMessage =
-          `⚠️ Penalty filed: ${offender.name} missed trash duty.` +
-          `\n${offender.name} will serve a ${PENALTY_LENGTH}-Tuesday penalty starting now.` +
-          `\n\nCheck the schedule: https://trashbot.kwon.ai`
-
-        const recipients = teamData.filter(
-          (member) => member && typeof member.phone === 'string' && member.phone
-        )
-
-        const alertResults = await Promise.allSettled(
-          recipients.map((member) => sendSms(env, member.phone, penaltyMessage))
-        )
-        const alertFailures = alertResults.filter((result) => {
-          if (result.status === 'rejected') return true
-          return result.value && result.value.ok === false
-        })
-        if (alertFailures.length > 0) {
-          console.error(
-            `Penalty alert failed for ${alertFailures.length} teammate(s).`
-          )
-        }
       }
 
       const responseData = {
@@ -444,36 +334,6 @@ export default {
 
 // --- HELPER FUNCTIONS ---
 
-async function sendSms(env, to, body) {
-  const url = `https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`
-  const data = new URLSearchParams({
-    To: to,
-    From: env.TWILIO_PHONE_NUMBER,
-    Body: body,
-  })
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization:
-          'Basic ' + btoa(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`),
-      },
-      body: data,
-    })
-    if (!response.ok) {
-      const errorData = await response.json()
-      console.error(`Twilio Error for ${to}:`, errorData.message)
-      return { ok: false, to, error: errorData.message }
-    } else {
-      console.log(`Message sent successfully to ${to}`)
-      return { ok: true, to }
-    }
-  } catch (error) {
-    console.error(`Failed to send message to ${to}:`, error)
-    return { ok: false, to, error: error?.message || 'unknown error' }
-  }
-}
-
 function getRotationDb(env) {
   const kv = env?.ROTATION_DB
   if (!kv || typeof kv.get !== 'function') {
@@ -482,10 +342,3 @@ function getRotationDb(env) {
   return kv
 }
 
-function formatDate(date) {
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  })
-}

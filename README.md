@@ -1,6 +1,6 @@
 # Trash Duty
 
-Automated trash duty rotation for a shared house. Cloudflare Worker handles scheduling and SMS notifications via Twilio. Static dashboard on Cloudflare Pages shows the schedule and lets housemates report missed duties with PIN protection.
+Automated trash duty rotation for a shared house. Cloudflare Worker handles scheduling and serves the API. Static dashboard on Cloudflare Pages shows the schedule and lets housemates report missed duties with PIN protection.
 
 Trash day is **Tuesday**.
 
@@ -20,22 +20,21 @@ Trash day is **Tuesday**.
 
 | Layer | What | Responsibilities |
 |-------|------|-----------------|
-| Cloudflare Worker | `worker/src/index.js` | Cron-triggered SMS, `/schedule` and `/report` API |
+| Cloudflare Worker | `worker/src/index.js` | Cron-triggered rotation, `/schedule` and `/report` API |
 | Cloudflare KV | `ROTATION_DB` namespace | Stores `TEAM_MEMBERS`, `CURRENT_INDEX`, `PENALTY_BOX` |
-| Twilio | REST API | SMS delivery |
-| Cloudflare Pages | Static files | Dashboard at `trashbot.kwon.ai` |
+| Cloudflare Pages | Static files | Dashboard at `trash.kwon.ai` |
 
 ## API
 
 **`GET /schedule`** — Returns current rotation state: on-duty person, previous duty, full team, current index, penalty info.
 
-**`POST /report`** — Files a missed-duty penalty. Requires JSON body `{ "pin": "<PIN>" }`. Returns 401 on wrong PIN, 400 on invalid body. Assigns the offender 3 consecutive Tuesdays of duty and notifies all housemates via SMS.
+**`POST /report`** — Files a missed-duty penalty. Requires JSON body `{ "pin": "<PIN>" }`. Returns 401 on wrong PIN, 400 on invalid body. Assigns the offender 3 consecutive Tuesdays of duty.
 
 ## KV Data Model
 
 | Key | Description |
 |-----|-------------|
-| `TEAM_MEMBERS` | JSON array of `{ name, phone }`. Index order = rotation order. |
+| `TEAM_MEMBERS` | JSON array of `{ name }`. Index order = rotation order. |
 | `CURRENT_INDEX` | Stringified integer pointing to the current duty person. |
 | `PENALTY_BOX` | `{ offenderIndex, weeksRemaining }`. Present only during active penalty. |
 
@@ -58,27 +57,18 @@ The frontend derives all dates relative to Tuesday and uses a forward-looking mo
 
 ```bash
 cd worker/src
-wrangler secret put TWILIO_ACCOUNT_SID
-wrangler secret put TWILIO_AUTH_TOKEN
-wrangler secret put TWILIO_PHONE_NUMBER
 wrangler secret put REPORT_PIN
 wrangler deploy
 ```
 
 ### Frontend
 
-Push `index.html`, `script.js`, and `style.css` to the `pages` branch. Cloudflare Pages auto-deploys.
+Cloudflare Pages auto-deploys from `main`.
 
 ### KV Setup
 
 ```bash
 wrangler kv:key put --binding=ROTATION_DB CURRENT_INDEX "0"
-wrangler kv:key put --binding=ROTATION_DB TEAM_MEMBERS '[{"name":"...","phone":"+1..."}]'
+wrangler kv:key put --binding=ROTATION_DB TEAM_MEMBERS '[{"name":"..."}]'
 ```
 
-## Testing Notifications
-
-1. Save current `TEAM_MEMBERS`
-2. Replace all phone numbers with a test number
-3. Trigger via `wrangler dev --test-scheduled`
-4. Restore original `TEAM_MEMBERS`

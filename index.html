@@ -12,8 +12,22 @@
   </head>
   <body>
     <div class="container">
-
-      <div class="date-badge" id="date-badge"></div>
+      <div class="top-row">
+        <div class="date-badge" id="date-badge"></div>
+        <a
+          class="github-link"
+          href="https://github.com/danieljbk/regent-house-trashbot"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Open Trashbot GitHub repository"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 .5A12 12 0 0 0 8.2 23.9c.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.5-4-1.5a3.1 3.1 0 0 0-1.3-1.7c-1.1-.8.1-.8.1-.8a2.5 2.5 0 0 1 1.8 1.2 2.6 2.6 0 0 0 3.5 1 2.5 2.5 0 0 1 .8-1.6c-2.7-.3-5.4-1.3-5.4-6A4.8 4.8 0 0 1 5.7 8a4.4 4.4 0 0 1 .1-3.1s1-.3 3.2 1.2a11 11 0 0 1 6 0C17.2 4.6 18.2 5 18.2 5a4.4 4.4 0 0 1 .1 3.1 4.8 4.8 0 0 1 1.3 3.4c0 4.7-2.7 5.7-5.4 6a2.8 2.8 0 0 1 .8 2.2v3.2c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z"
+            ></path>
+          </svg>
+        </a>
+      </div>
 
       <div
         id="penalty-status"
@@ -25,11 +39,6 @@
         <span class="label" id="hero-label">Next duty</span>
         <h2 class="hero-name" id="on-duty">Loading...</h2>
         <p class="hero-date" id="trash-day-date"></p>
-      </section>
-
-      <section class="card prev-duty-card">
-        <span class="label">Previous duty</span>
-        <span class="prev-duty-name" id="prev-duty">...</span>
       </section>
 
       <section class="card">
@@ -48,6 +57,11 @@
       <section class="card">
         <span class="label">Rotation order</span>
         <ul class="rotation-list" id="rotation-list"></ul>
+      </section>
+
+      <section class="card prev-duty-card">
+        <span class="label">Previous duty</span>
+        <span class="prev-duty-name" id="prev-duty">...</span>
       </section>
 
       <section class="card">

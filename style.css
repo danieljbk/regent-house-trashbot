@@ -41,6 +41,44 @@ body {
   gap: 0.75rem;
 }
 
+/* Top row */
+.top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.github-link {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+}
+
+.github-link:hover {
+  color: var(--foreground);
+  border-color: var(--border-strong);
+  background: var(--muted);
+}
+
+.github-link:focus-visible {
+  outline: 2px solid var(--foreground-faint);
+  outline-offset: 2px;
+}
+
+.github-link svg {
+  width: 1rem;
+  height: 1rem;
+  fill: currentColor;
+}
+
 /* Header */
 header {
   padding: 0.5rem 0;

@@ -15,6 +15,21 @@ const reportToggle = document.getElementById('report-toggle')
 const reportBody = document.getElementById('report-body')
 const reportChevron = document.getElementById('report-chevron')
 const reportPinInput = document.getElementById('report-pin')
+const adminToggle = document.getElementById('admin-toggle')
+const adminBody = document.getElementById('admin-body')
+const adminChevron = document.getElementById('admin-chevron')
+const adminPinInput = document.getElementById('admin-pin')
+const adminLoadBtn = document.getElementById('admin-load-btn')
+const adminStatePanel = document.getElementById('admin-state-panel')
+const adminIndexSelect = document.getElementById('admin-index-select')
+const adminSaveIndex = document.getElementById('admin-save-index')
+const adminPenaltyDisplay = document.getElementById('admin-penalty-display')
+const adminClearPenalty = document.getElementById('admin-clear-penalty')
+const adminTeamEditor = document.getElementById('admin-team-editor')
+const adminSaveTeam = document.getElementById('admin-save-team')
+const adminResponseEl = document.getElementById('admin-response')
+
+let currentOffenderIndex = null
 
 const MAX_UPCOMING_ROWS = 4
 
@@ -91,6 +106,14 @@ reportToggle.addEventListener('click', () => {
   reportChevron.classList.toggle('open', isHidden)
 })
 
+// --- ADMIN TOGGLE ---
+
+adminToggle.addEventListener('click', () => {
+  const isHidden = adminBody.style.display === 'none'
+  adminBody.style.display = isHidden ? 'block' : 'none'
+  adminChevron.classList.toggle('open', isHidden)
+})
+
 // --- FETCH SCHEDULE ---
 
 async function fetchSchedule() {
@@ -120,6 +143,8 @@ async function fetchSchedule() {
     const isTuesday = dayOfWeek === 2
     heroLabelEl.textContent = isTuesday ? "Today's duty" : 'Next duty'
 
+    const team = data.team || []
+
     if (pastTuesday && allUpcoming.length > 0) {
       // Trash day passed — show next person as hero
       onDutyEl.textContent = allUpcoming[0]
@@ -128,12 +153,14 @@ async function fetchSchedule() {
       trashDayDateEl.textContent = formatDateFull(nextTuesday)
       prevDutyEl.textContent = data.onDuty
       prevDutyReportEl.textContent = data.onDuty
+      currentOffenderIndex = data.currentIndex
     } else {
       // Mon/Tue — show current person
       onDutyEl.textContent = data.onDuty
       trashDayDateEl.textContent = formatDateFull(thisWeekTue)
       prevDutyEl.textContent = data.lastWeek
       prevDutyReportEl.textContent = data.lastWeek
+      currentOffenderIndex = (data.currentIndex - 1 + team.length) % team.length
     }
 
     // Upcoming schedule — skip first entry if it's now the hero
@@ -173,7 +200,6 @@ async function fetchSchedule() {
 
     // Rotation order
     rotationListEl.innerHTML = ''
-    const team = data.team || []
     const currentIndex = Number.parseInt(data.currentIndex, 10)
 
     team.forEach((member, index) => {
@@ -233,6 +259,12 @@ reportButton.addEventListener('click', async () => {
     return
   }
 
+  if (currentOffenderIndex === null) {
+    reportResponseEl.textContent = 'Schedule not loaded. Please refresh.'
+    reportResponseEl.className = 'report-response error'
+    return
+  }
+
   if (
     !confirm(
       `Report ${prevDutyReportEl.textContent} for missing their duty?`
@@ -248,7 +280,7 @@ reportButton.addEventListener('click', async () => {
     const response = await fetch(`${WORKER_URL}/report`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin }),
+      body: JSON.stringify({ pin, offenderIndex: currentOffenderIndex }),
     })
 
     const result = await response.json()
@@ -267,6 +299,167 @@ reportButton.addEventListener('click', async () => {
     reportResponseEl.className = 'report-response error'
   } finally {
     reportButton.disabled = false
+  }
+})
+
+// --- ADMIN FUNCTIONS ---
+
+function showAdminResponse(msg, type) {
+  adminResponseEl.textContent = msg
+  adminResponseEl.className = 'admin-response ' + (type || '')
+}
+
+adminLoadBtn.addEventListener('click', async () => {
+  const pin = adminPinInput.value.trim()
+  if (!pin) {
+    showAdminResponse('Please enter the PIN.', 'error')
+    return
+  }
+
+  try {
+    adminLoadBtn.disabled = true
+    showAdminResponse('Loading...')
+    const res = await fetch(
+      `${WORKER_URL}/admin/state?pin=${encodeURIComponent(pin)}`
+    )
+    const data = await res.json()
+
+    if (!res.ok) {
+      showAdminResponse(data.error || 'Failed to load state.', 'error')
+      return
+    }
+
+    // Populate index dropdown
+    adminIndexSelect.innerHTML = ''
+    const team = data.team || []
+    team.forEach((member, i) => {
+      const opt = document.createElement('option')
+      opt.value = i
+      opt.textContent = `${i}: ${member.name}`
+      if (i === data.currentIndex) opt.selected = true
+      adminIndexSelect.appendChild(opt)
+    })
+
+    // Populate penalty display
+    if (data.penaltyBox && Number.isInteger(data.penaltyBox.offenderIndex)) {
+      const offName = team[data.penaltyBox.offenderIndex]?.name || '?'
+      adminPenaltyDisplay.textContent =
+        `Offender: ${offName} (index ${data.penaltyBox.offenderIndex})\n` +
+        `Weeks remaining: ${data.penaltyBox.weeksRemaining}`
+    } else {
+      adminPenaltyDisplay.textContent = 'None'
+    }
+
+    // Populate team editor
+    adminTeamEditor.value = JSON.stringify(team, null, 2)
+
+    adminStatePanel.style.display = 'block'
+    showAdminResponse('State loaded.', 'success')
+  } catch (error) {
+    showAdminResponse('Network error.', 'error')
+  } finally {
+    adminLoadBtn.disabled = false
+  }
+})
+
+adminSaveIndex.addEventListener('click', async () => {
+  const pin = adminPinInput.value.trim()
+  if (!pin) {
+    showAdminResponse('PIN required.', 'error')
+    return
+  }
+
+  const idx = parseInt(adminIndexSelect.value, 10)
+  try {
+    adminSaveIndex.disabled = true
+    const res = await fetch(`${WORKER_URL}/admin/state`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin, currentIndex: idx }),
+    })
+    const data = await res.json()
+    showAdminResponse(
+      res.ok ? data.message : data.error || 'Failed.',
+      res.ok ? 'success' : 'error'
+    )
+    if (res.ok) fetchSchedule()
+  } catch (e) {
+    showAdminResponse('Network error.', 'error')
+  } finally {
+    adminSaveIndex.disabled = false
+  }
+})
+
+adminClearPenalty.addEventListener('click', async () => {
+  const pin = adminPinInput.value.trim()
+  if (!pin) {
+    showAdminResponse('PIN required.', 'error')
+    return
+  }
+  if (!confirm('Clear the penalty box?')) return
+
+  try {
+    adminClearPenalty.disabled = true
+    const res = await fetch(`${WORKER_URL}/admin/penalty`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin }),
+    })
+    const data = await res.json()
+    showAdminResponse(
+      res.ok ? data.message : data.error || 'Failed.',
+      res.ok ? 'success' : 'error'
+    )
+    if (res.ok) {
+      adminPenaltyDisplay.textContent = 'None'
+      fetchSchedule()
+    }
+  } catch (e) {
+    showAdminResponse('Network error.', 'error')
+  } finally {
+    adminClearPenalty.disabled = false
+  }
+})
+
+adminSaveTeam.addEventListener('click', async () => {
+  const pin = adminPinInput.value.trim()
+  if (!pin) {
+    showAdminResponse('PIN required.', 'error')
+    return
+  }
+
+  let team
+  try {
+    team = JSON.parse(adminTeamEditor.value)
+  } catch (e) {
+    showAdminResponse('Invalid JSON. Check syntax.', 'error')
+    return
+  }
+
+  if (!Array.isArray(team) || team.length === 0) {
+    showAdminResponse('Team must be a non-empty array.', 'error')
+    return
+  }
+
+  if (!confirm(`Save team with ${team.length} members?`)) return
+
+  try {
+    adminSaveTeam.disabled = true
+    const res = await fetch(`${WORKER_URL}/admin/state`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin, team }),
+    })
+    const data = await res.json()
+    showAdminResponse(
+      res.ok ? data.message : data.error || 'Failed.',
+      res.ok ? 'success' : 'error'
+    )
+    if (res.ok) fetchSchedule()
+  } catch (e) {
+    showAdminResponse('Network error.', 'error')
+  } finally {
+    adminSaveTeam.disabled = false
   }
 })
 

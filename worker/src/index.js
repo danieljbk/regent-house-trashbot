@@ -87,7 +87,7 @@ export default {
     const url = new URL(request.url)
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     }
 
@@ -228,8 +228,7 @@ export default {
         )
       }
 
-      const pin = typeof body.pin === 'string' ? body.pin.trim() : ''
-      if (!env.REPORT_PIN || pin !== env.REPORT_PIN) {
+      if (!validatePin(body, env)) {
         return new Response(
           JSON.stringify({ error: 'Incorrect PIN.' }),
           {
@@ -238,6 +237,10 @@ export default {
           }
         )
       }
+
+      const submittedOffenderIndex = typeof body.offenderIndex === 'number'
+        ? body.offenderIndex
+        : undefined
 
       let rotationDb
       try {
@@ -267,10 +270,26 @@ export default {
         )
       }
       const teamSize = teamData.length
-      const currentIndex = parseInt(
-        (await rotationDb.get('CURRENT_INDEX')) || '0'
-      )
-      // Determine if a penalty is already active so we can decide who actually missed.
+
+      // Validate the offender index submitted by the frontend.
+      if (
+        submittedOffenderIndex === undefined ||
+        !Number.isInteger(submittedOffenderIndex) ||
+        submittedOffenderIndex < 0 ||
+        submittedOffenderIndex >= teamSize
+      ) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid offender index.' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        )
+      }
+
+      const offenderIndex = submittedOffenderIndex
+
+      // Check for an existing active penalty.
       const existingPenalty =
         (await rotationDb.get('PENALTY_BOX', 'json')) || {}
       const existingFutureWeeks = Number.isInteger(
@@ -281,12 +300,22 @@ export default {
       const hasActivePenalty =
         Number.isInteger(existingPenalty.offenderIndex) &&
         existingFutureWeeks > 0
-      // If a penalty is active we penalize the same offender again; otherwise fall back to
-      // the previous duty’s person based on rotation order.
-      const offenderIndex = hasActivePenalty
-        ? existingPenalty.offenderIndex
-        : (currentIndex - 1 + teamSize) % teamSize
 
+      // If a penalty is active for a different person, reject the report.
+      if (hasActivePenalty && existingPenalty.offenderIndex !== offenderIndex) {
+        const existingOffender = teamData[existingPenalty.offenderIndex]
+        return new Response(
+          JSON.stringify({
+            error: `A penalty is already active for ${existingOffender?.name || 'another person'}. Clear it first before filing a new report.`,
+          }),
+          {
+            status: 409,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        )
+      }
+
+      // If the same person already has the maximum penalty queued, ignore the report.
       if (
         hasActivePenalty &&
         existingPenalty.offenderIndex === offenderIndex &&
@@ -328,11 +357,168 @@ export default {
       })
     }
 
+    // --- ADMIN ENDPOINTS ---
+
+    if (url.pathname === '/admin/state' && request.method === 'GET') {
+      const pin = url.searchParams.get('pin') || ''
+      if (!env.REPORT_PIN || pin.trim() !== env.REPORT_PIN) {
+        return new Response(
+          JSON.stringify({ error: 'Incorrect PIN.' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      try {
+        const rotationDb = getRotationDb(env)
+        const team = await rotationDb.get('TEAM_MEMBERS', 'json')
+        const currentIndex = parseInt((await rotationDb.get('CURRENT_INDEX')) || '0')
+        const penaltyBox = (await rotationDb.get('PENALTY_BOX', 'json')) || null
+
+        return new Response(
+          JSON.stringify({ team, currentIndex, penaltyBox }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } catch (error) {
+        console.error('Admin state read failed:', error.message)
+        return new Response(
+          JSON.stringify({ error: 'Failed to read state.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
+    if (url.pathname === '/admin/state' && request.method === 'PUT') {
+      let body = {}
+      try {
+        body = await request.json()
+      } catch (e) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid request body.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (!validatePin(body, env)) {
+        return new Response(
+          JSON.stringify({ error: 'Incorrect PIN.' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      try {
+        const rotationDb = getRotationDb(env)
+        const updated = []
+
+        if (body.team !== undefined) {
+          if (!Array.isArray(body.team) || body.team.length === 0) {
+            return new Response(
+              JSON.stringify({ error: 'team must be a non-empty array.' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+          for (const member of body.team) {
+            if (!member || typeof member.name !== 'string' || !member.name.trim()) {
+              return new Response(
+                JSON.stringify({ error: 'Each team member must have a non-empty "name" string.' }),
+                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              )
+            }
+          }
+          await rotationDb.put('TEAM_MEMBERS', JSON.stringify(body.team))
+          updated.push('team')
+        }
+
+        if (body.currentIndex !== undefined) {
+          const idx = Number(body.currentIndex)
+          if (!Number.isInteger(idx) || idx < 0) {
+            return new Response(
+              JSON.stringify({ error: 'currentIndex must be a non-negative integer.' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+          await rotationDb.put('CURRENT_INDEX', idx.toString())
+          updated.push('currentIndex')
+        }
+
+        if (body.penaltyBox !== undefined) {
+          if (body.penaltyBox === null) {
+            await rotationDb.delete('PENALTY_BOX')
+            updated.push('penaltyBox (cleared)')
+          } else {
+            const pb = body.penaltyBox
+            if (
+              !Number.isInteger(pb.offenderIndex) ||
+              pb.offenderIndex < 0 ||
+              !Number.isInteger(pb.weeksRemaining) ||
+              pb.weeksRemaining < 0
+            ) {
+              return new Response(
+                JSON.stringify({ error: 'penaltyBox must have valid offenderIndex and weeksRemaining.' }),
+                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              )
+            }
+            await rotationDb.put('PENALTY_BOX', JSON.stringify(pb))
+            updated.push('penaltyBox')
+          }
+        }
+
+        return new Response(
+          JSON.stringify({ message: `Updated: ${updated.join(', ')}` }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } catch (error) {
+        console.error('Admin state update failed:', error.message)
+        return new Response(
+          JSON.stringify({ error: 'Failed to update state.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
+    if (url.pathname === '/admin/penalty' && request.method === 'DELETE') {
+      let body = {}
+      try {
+        body = await request.json()
+      } catch (e) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid request body.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (!validatePin(body, env)) {
+        return new Response(
+          JSON.stringify({ error: 'Incorrect PIN.' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      try {
+        const rotationDb = getRotationDb(env)
+        await rotationDb.delete('PENALTY_BOX')
+        return new Response(
+          JSON.stringify({ message: 'Penalty box cleared.' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } catch (error) {
+        console.error('Admin penalty clear failed:', error.message)
+        return new Response(
+          JSON.stringify({ error: 'Failed to clear penalty.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
     return new Response('Not Found', { status: 404, headers: corsHeaders })
   },
 }
 
 // --- HELPER FUNCTIONS ---
+
+function validatePin(body, env) {
+  const pin = typeof body.pin === 'string' ? body.pin.trim() : ''
+  return env.REPORT_PIN && pin === env.REPORT_PIN
+}
 
 function getRotationDb(env) {
   const kv = env?.ROTATION_DB

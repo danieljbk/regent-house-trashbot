@@ -329,3 +329,133 @@ header h1 {
 .report-response.success {
   color: var(--active-dot);
 }
+
+/* Admin section */
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.admin-header .label {
+  margin-bottom: 0;
+}
+
+.admin-body {
+  margin-top: 1rem;
+}
+
+.admin-description {
+  font-size: 0.8125rem;
+  color: var(--foreground-muted);
+  line-height: 1.5;
+  margin-bottom: 0.75rem;
+}
+
+.admin-field {
+  margin-bottom: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.admin-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--foreground-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.375rem;
+}
+
+.admin-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.admin-select {
+  flex: 1;
+  background: var(--background);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+.admin-pre {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--foreground-muted);
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 0.5rem;
+}
+
+.admin-textarea {
+  width: 100%;
+  background: var(--background);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--foreground);
+  font-family: monospace;
+  resize: vertical;
+  margin-bottom: 0.5rem;
+}
+
+.admin-textarea:focus {
+  border-color: var(--foreground-faint);
+  outline: none;
+}
+
+.btn-secondary {
+  background: var(--muted);
+  color: var(--foreground);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s, border-color 0.15s;
+  font-family: var(--font-sans);
+}
+
+.btn-secondary:hover {
+  border-color: var(--foreground-faint);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-small {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.admin-response {
+  margin-top: 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--foreground-muted);
+}
+
+.admin-response.error {
+  color: var(--destructive);
+}
+
+.admin-response.success {
+  color: var(--active-dot);
+}

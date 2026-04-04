@@ -88,8 +88,59 @@
           <p class="report-response" id="report-response"></p>
         </div>
       </section>
+      <section class="card">
+        <div class="admin-header" id="admin-toggle">
+          <span class="label">Admin</span>
+          <span class="chevron" id="admin-chevron">&#9662;</span>
+        </div>
+        <div class="admin-body" id="admin-body" style="display: none">
+          <p class="admin-description">
+            Manage rotation state. All actions require the PIN.
+          </p>
+          <div class="pin-row" style="margin-bottom: 0.75rem">
+            <input
+              type="password"
+              id="admin-pin"
+              class="pin-input"
+              placeholder="Enter PIN"
+              maxlength="10"
+              autocomplete="off"
+            />
+            <button id="admin-load-btn" class="btn-secondary">Load State</button>
+          </div>
+
+          <div id="admin-state-panel" style="display: none">
+            <div class="admin-field">
+              <label class="admin-label">Current duty (index)</label>
+              <div class="admin-row">
+                <select id="admin-index-select" class="admin-select"></select>
+                <button id="admin-save-index" class="btn-secondary btn-small">Save</button>
+              </div>
+            </div>
+
+            <div class="admin-field">
+              <label class="admin-label">Penalty box</label>
+              <pre id="admin-penalty-display" class="admin-pre">None</pre>
+              <button id="admin-clear-penalty" class="btn-destructive btn-small">Clear Penalty</button>
+            </div>
+
+            <div class="admin-field">
+              <label class="admin-label">Team roster (JSON)</label>
+              <textarea
+                id="admin-team-editor"
+                class="admin-textarea"
+                rows="6"
+                spellcheck="false"
+              ></textarea>
+              <button id="admin-save-team" class="btn-secondary btn-small">Save Team</button>
+            </div>
+
+            <p class="admin-response" id="admin-response"></p>
+          </div>
+        </div>
+      </section>
     </div>
 
-    <script src="script.js?v=20260302b"></script>
+    <script src="script.js?v=20260403a"></script>
   </body>
 </html>
